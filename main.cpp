@@ -11,9 +11,10 @@ int main(int argc, char *argv[])
   format.setSamples(4);
   QSurfaceFormat::setDefaultFormat(format);
   MainWindow w;
-//  w.showMaximized();
 //  w.show();
-  w.showFullScreen();
-  w.ShowImgPanel();
+//  w.showFullScreen();
+  w.InitImgPanel();
+  w.showMaximized();
+//  w.showMaximized();
   return a.exec();
 }

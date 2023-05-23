@@ -6,6 +6,7 @@ ImagesPanel::ImagesPanel(QWidget *parent)
     : QWidget{parent}
 {
   const char* file = "D:/docs/movie/.unknown/6798973.mp4";
+//  file = "Z:/coding/github/steins_gate_cut.mkv";
   dec_obj_ = new DecoderThread;
   dec_obj_->Init(file);
   dec_obj_->moveToThread(&dec_thread_);
@@ -22,33 +23,28 @@ ImagesPanel::ImagesPanel(QWidget *parent)
   timer_ = new QTimer(this);
   connect(timer_, &QTimer::timeout, dec_obj_, &DecoderThread::on_timer);
   connect(timer_, &QTimer::timeout, this, &ImagesPanel::on_timer);
-  timer_->start(1000);
+  timer_->start(300);
 }
 
 void ImagesPanel::InitGLWidgets()
 {
-  uint32_t max_glwidgets = 16;
+  if (!layout_)
+    layout_ = new QGridLayout;
 
-  for (uint32_t i = 0; i < max_glwidgets; ++i) {
-    GLWidget *glw = new GLWidget;
-    glwidgets_.push_back(glw);
+//  uint32_t glw_idx = 0;
+  for (uint32_t row = 0; row < layout_row_; ++row) {
+    for (uint32_t col = 0; col < layout_col_; ++col) {
+      GLWidget *glw = new GLWidget;
+      glwidgets_.push_back(glw);
+      layout_->addWidget(glw, row, col);
+    }
   }
+  setLayout(layout_);
 }
 
 void ImagesPanel::PutLayout()
 {
-  if (!layout_)
-    layout_ = new QGridLayout;
 
-  uint32_t n_row = 4;
-  uint32_t n_col = 4;
-  uint32_t glw_idx = 0;
-  for (uint32_t row = 0; row < n_row; ++row) {
-    for (uint32_t col = 0; col < n_col; ++col) {
-      layout_->addWidget(glwidgets_[glw_idx++], row, col);
-    }
-  }
-  setLayout(layout_);
 }
 
 void ImagesPanel::on_frame_decoded(uint32_t frame_id, AVFrame* avframe)
@@ -61,12 +57,12 @@ void ImagesPanel::on_frame_decoded(uint32_t frame_id, AVFrame* avframe)
   frames_map.emplace(frame_id, avframe);
   uint32_t glw_idx = frame_id % glwidgets_.size();
   glwidgets_[glw_idx]->repaint(avframe);
-    emit signal_frame_consumed(avframe);
+  emit signal_frame_consumed(avframe);
 }
 
 void ImagesPanel::on_timer()
 {
-    emit signal_require_frames(4*4);
+  emit signal_require_frames(layout_row_ * layout_col_);
 }
 
 

@@ -15,14 +15,6 @@ MainWindow::MainWindow(QWidget *parent)
 {
   ui->setupUi(this);
   img_panel_ = new ImagesPanel(this);
-//  glwidget_ = new GLWidget;
-
-//  QGridLayout *mainLayout = new QGridLayout;
-//  mainLayout->addWidget(glwidget_, 0, 0);
-//  setLayout(mainLayout);
-//  connect(glwidget_, &GLWidget::signal_on_avframe, glwidget_, &GLWidget::repaint);
-//  connect(&dec_thread_, &DecoderThread::signal_on_avframe, this, &MainWindow::slots_on_avframe);
-//  dec_thread_.start();
 }
 
 MainWindow::~MainWindow()
@@ -30,20 +22,15 @@ MainWindow::~MainWindow()
   delete ui;
 }
 
-void MainWindow::ShowImgPanel()
+void MainWindow::InitImgPanel()
 {
   img_panel_->InitGLWidgets();
   img_panel_->PutLayout();
-  img_panel_->resize(1600, 900);
   img_panel_->setWindowTitle("image_panel");
-  img_panel_->show();
-//  img_panel_->showFullScreen();
-}
+  img_panel_->resize(1600, 900);
 
-//void MainWindow::resizeEvent(QResizeEvent*)
-//{
-////  glwidget_->setMinimumSize(0, 0);
-//}
+  setCentralWidget(img_panel_);
+}
 
 void MainWindow::slots_on_avframe(AVFrame* frame)
 {
@@ -54,7 +41,4 @@ void MainWindow::slots_on_avframe(AVFrame* frame)
       << " dts:" << frame->pkt_dts << " :"
       << frame->pts;
   ++frame_id;
-
-//  glwidget_->repaint(frame);
-//  emit glwidget_->signal_on_avframe(frame);
 }

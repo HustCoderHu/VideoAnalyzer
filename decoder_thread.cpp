@@ -488,7 +488,7 @@ void DecoderThread::on_require_frames(uint32_t n)
 
 void DecoderThread::on_frame_consumed(AVFrame* avframe)
 {
-  LOG << avframe;
+//  LOG << avframe;
   av_frame_unref(avframe);
   avframes_mgr.PutFree(avframe);
 }

@@ -45,6 +45,8 @@ public:
   vector<uint32_t> displayed_frame_ids;
 
   QGridLayout *layout_ = nullptr;
+  uint32_t layout_row_ = 7;
+  uint32_t layout_col_ = 7;
 
   DecoderThread *dec_obj_ = nullptr;
   QThread dec_thread_;

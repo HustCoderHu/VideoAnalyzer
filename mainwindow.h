@@ -12,6 +12,7 @@ extern "C" {
 
 
 class ImagesPanel;
+class QGridLayout;
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -27,7 +28,7 @@ public:
   MainWindow(QWidget *parent = nullptr);
   ~MainWindow();
 
-  void ShowImgPanel();
+  void InitImgPanel();
 
 //  void resizeEvent(QResizeEvent *);
 
@@ -37,10 +38,8 @@ public slots:
 private:
   Ui::MainWindow *ui;
 
+  QGridLayout *layout_;
   ImagesPanel *img_panel_;
-
-//  DecoderThread dec_thread_;
-//  GLWidget *glwidget_;
 };
 
 #endif // MAINWINDOW_H
