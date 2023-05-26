@@ -1,9 +1,10 @@
-
+#include <QWheelEvent>
 #include "glwidget.h"
-
 extern "C" { // 用C规则编译指定的代码
 #include "libavcodec/avcodec.h"
 }
+
+#include "mylog.h"
 
 
 // 三个顶点坐标XYZ，VAO、VBO数据播放，范围时[-1 ~ 1]直接
@@ -48,6 +49,10 @@ void GLWidget::repaint(AVFrame *frame)
   // 如果帧长宽为0则不需要绘制
   if(!frame || frame->width == 0 || frame->height == 0) return;
 
+  if (gl_viewport_rect_.isEmpty()) {
+    gl_viewport_rect_.setRect(0, 0, m_zoomSize.width(), m_zoomSize.height());
+  }
+
   m_format = frame->format;
   switch (m_format)
   {
@@ -67,6 +72,42 @@ void GLWidget::repaint(AVFrame *frame)
 //  av_frame_unref(frame);  //  取消引用帧引用的所有缓冲区并重置帧字段。
 
   this->update();
+}
+
+/**
+ * @brief 根据鼠标滚轮调整
+ * @param event
+ */
+void GLWidget::wheelEvent(QWheelEvent *event)
+{
+  if (gl_viewport_rect_.isEmpty())
+    return;
+
+  QPoint numDegrees;                  // 定义指针类型参数numDegrees用于获取滚轮转角
+  numDegrees = event->angleDelta();   // 获取滚轮转角
+  int step = 0;                       // 设置中间参数step用于将获取的数值转换成整数型
+  if (!numDegrees.isNull())           // 判断滚轮是否转动
+  {
+    step = numDegrees.y();            // 将滚轮转动数值传给中间参数step
+  }
+  int new_width = 0;
+  if (step > 0)
+    new_width = gl_viewport_rect_.width() * 107 / 100;
+  else if (step < 0)
+    new_width = gl_viewport_rect_.width() * 93 / 100;
+
+  int new_height = new_width * m_zoomSize.height() / m_zoomSize.width();
+  QPointF mouse_pos = event->position();
+  int x = mouse_pos.x() - new_width / 2;
+  // qt widget 鼠标 Y 坐标和 opengl 相反
+  // qt 左上角 (0, 0), opengl 左下角 (0, 0)
+  int y = rect().height() - mouse_pos.y() - new_height / 2;
+  gl_viewport_rect_.setX(x);
+  gl_viewport_rect_.setY(y);
+  gl_viewport_rect_.setWidth(new_width);
+  gl_viewport_rect_.setHeight(new_height);
+  LOG << gl_viewport_rect_;
+  update();
 }
 
 
@@ -163,7 +204,15 @@ void GLWidget::paintGL()
 {
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   // 将窗口的位平面区域（背景）设置为先前由glClearColor、glClearDepth和选择的值
-  glViewport(m_pos.x(), m_pos.y(), m_zoomSize.width(), m_zoomSize.height());
+//  uint32_t black_border_width = 100;
+//  uint32_t black_border_height = black_border_width * m_zoomSize.height() / m_zoomSize.width();
+//  glViewport(m_pos.x(), m_pos.y(),
+//             m_zoomSize.width() - black_border_width, m_zoomSize.height() - black_border_height);
+//  glViewport(0, 0, m_zoomSize.width() - black_border_width, m_zoomSize.height() - black_border_height);
+//  glViewport(x, y, gl_viewport_width_, gl_viewport_height_);
+  glViewport(gl_viewport_rect_.x(), gl_viewport_rect_.y(),
+             gl_viewport_rect_.width(), gl_viewport_rect_.height());
+
   // 设置视图大小实现图片自适应
 
   m_program->bind();               // 绑定着色器
@@ -242,6 +291,8 @@ void GLWidget::repaintTexYUV420P(AVFrame* frame)
   m_options.setImageHeight(frame->height);
   m_options.setRowLength(frame->linesize[0]);
   m_texY->setData(QOpenGLTexture::Red, QOpenGLTexture::UInt8, static_cast<const void *>(frame->data[0]), &m_options);   // 设置图像数据 Y
+//  memset(frame->data[1], 0, frame->linesize[1]);
+//  memset(frame->data[2], 0, frame->linesize[2]);
   m_options.setRowLength(frame->linesize[1]);
   m_texU->setData(QOpenGLTexture::Red, QOpenGLTexture::UInt8, static_cast<const void *>(frame->data[1]), &m_options);   // 设置图像数据 U
   m_options.setRowLength(frame->linesize[2]);

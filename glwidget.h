@@ -27,6 +27,7 @@ public:
 
 public:
   void repaint(AVFrame* frame); // 设置需要绘制的图像帧
+  void wheelEvent(QWheelEvent* event) override;
 
 protected:
   void initializeGL() override;
@@ -61,4 +62,6 @@ private:
   QSizeF  m_zoomSize;
   QPointF m_pos;
   int m_format;         // 像素格式
+
+  QRect gl_viewport_rect_;
 };
