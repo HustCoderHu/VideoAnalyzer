@@ -19,6 +19,7 @@ class ImagesPanel : public QWidget
   Q_OBJECT
 public:
   explicit ImagesPanel(QWidget *parent = nullptr);
+  ~ImagesPanel();
 
   void InitGLWidgets();
 
@@ -49,7 +50,7 @@ public:
   uint32_t layout_col_ = 1;
 
   DecoderThread *dec_obj_ = nullptr;
-  QThread dec_thread_;
+  QThread *dec_thread_;
   QTimer *timer_ = nullptr;
 };
 

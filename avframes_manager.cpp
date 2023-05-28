@@ -69,6 +69,7 @@ AVFrame* AVFramesManager::GetFree()
     return frame;
   }
   AVFrame *frame = free_frames_.back();
+  frame->format = AV_PIX_FMT_NONE;
   free_frames_.pop_back();
   return frame;
 }

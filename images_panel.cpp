@@ -9,10 +9,12 @@ ImagesPanel::ImagesPanel(QWidget *parent)
 //  file = "Z:/coding/github/steins_gate_cut.mkv";
   dec_obj_ = new DecoderThread;
   dec_obj_->Init(file);
-  dec_obj_->moveToThread(&dec_thread_);
-  dec_thread_.start();
+  dec_thread_ = new QThread;
+  dec_obj_->moveToThread(dec_thread_);
+  dec_thread_->start();
 
-  connect(&dec_thread_, &QThread::finished, dec_obj_, &QObject::deleteLater);
+  connect(dec_thread_, &QThread::finished, dec_obj_, &QObject::deleteLater);
+  connect(dec_thread_, &QThread::finished, dec_thread_, &QObject::deleteLater);
   connect(this, &ImagesPanel::signal_require_frames,
           dec_obj_, &DecoderThread::on_require_frames);
   connect(dec_obj_, &DecoderThread::signal_frame_decoded,
@@ -23,7 +25,13 @@ ImagesPanel::ImagesPanel(QWidget *parent)
   timer_ = new QTimer(this);
   connect(timer_, &QTimer::timeout, dec_obj_, &DecoderThread::on_timer);
   connect(timer_, &QTimer::timeout, this, &ImagesPanel::on_timer);
-  timer_->start(300);
+  timer_->start(1000);
+}
+
+ImagesPanel::~ImagesPanel()
+{
+  dec_thread_->quit();
+  dec_thread_->wait();
 }
 
 void ImagesPanel::InitGLWidgets()
@@ -49,6 +57,7 @@ void ImagesPanel::PutLayout()
 
 void ImagesPanel::on_frame_decoded(uint32_t frame_id, AVFrame* avframe)
 {
+  timer_->stop();
   LOG << "fid: " << frame_id
       << " key:" << avframe->key_frame
       << " pts:" << avframe->pkt_pos
@@ -57,12 +66,10 @@ void ImagesPanel::on_frame_decoded(uint32_t frame_id, AVFrame* avframe)
   frames_map.emplace(frame_id, avframe);
   uint32_t glw_idx = frame_id % glwidgets_.size();
   glwidgets_[glw_idx]->repaint(avframe);
-  emit signal_frame_consumed(avframe);
+//  emit signal_frame_consumed(avframe);
 }
 
 void ImagesPanel::on_timer()
 {
   emit signal_require_frames(layout_row_ * layout_col_);
 }
-
-

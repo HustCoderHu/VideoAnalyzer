@@ -34,9 +34,13 @@ public:
   int open_codec_context(int *stream_idx, AVCodecContext **codec_ctx, enum AVMediaType type);
   int get_format_from_sample_fmt(const char **fmt, enum AVSampleFormat sample_fmt);
 
+  AVPixelFormat get_hw_format(AVCodecContext *ctx,
+                              const enum AVPixelFormat *pix_fmts);
+
 private:
   uint32_t emit_frames(uint32_t n);
   uint32_t decode_and_cache(uint32_t max_cache);
+  int decode_hw_and_cache(uint32_t max_cache);
 
 public slots:
   void on_require_frames(uint32_t n);

@@ -1,12 +1,17 @@
 
 #pragma once
-
+#include <memory>
 #include <QOpenGLWidget>
 #include <QOpenGLFunctions>
 #include <QOpenGLFunctions_3_3_Core>
 #include <qopenglshaderprogram.h>
 #include <QOpenGLTexture>
 #include <qopenglpixeltransferoptions.h>
+
+#include "roi_rect_gl_helper.h"
+#include "yuv_grid_viewer.h"
+
+using std::shared_ptr;
 
 struct AVFrame;
 
@@ -28,11 +33,13 @@ public:
 public:
   void repaint(AVFrame* frame); // 设置需要绘制的图像帧
   void wheelEvent(QWheelEvent* event) override;
+  void mousePressEvent(QMouseEvent* event) override;
 
 protected:
-  void initializeGL() override;
+  void initializeGL() override;void OnPaintGL();
   void resizeGL(int w, int h) override;
   void paintGL() override;
+  void paintRoiRect();
 
 signals:
   void signal_on_avframe(AVFrame *frame);
@@ -47,6 +54,8 @@ private:
   void initTexNV12(AVFrame* frame);
   void freeTexNV12();
 
+  void recordAVFrameData(AVFrame* frame);
+
 private:
   QOpenGLShaderProgram* m_program = nullptr;
   QOpenGLTexture* m_texY = nullptr;
@@ -58,10 +67,16 @@ private:
   GLuint VBO = 0;       // 顶点缓冲对象,负责将数据从内存放到缓存，一个VBO可以用于多个VAO
   GLuint VAO = 0;       // 顶点数组对象,任何随后的顶点属性调用都会储存在这个VAO中，一个VAO可以有多个VBO
   GLuint EBO = 0;       // 元素缓冲对象,它存储 OpenGL 用来决定要绘制哪些顶点的索引
-  QSize  m_size;
+  QSize  frame_size_;
   QSizeF  m_zoomSize;
   QPointF m_pos;
   int m_format;         // 像素格式
 
-  QRect gl_viewport_rect_;
+  AVFrame *avframe_;
+  shared_ptr<uint8_t> frame_data;
+  uint8_t linesize[3];
+
+  RoiRectGLHelper *roi_rect_gl_helper_;
+
+  YUVGridViewer *yuv_grid_;
 };

@@ -30,8 +30,12 @@ set(PROJECT_SOURCES
   avframes_manager.h avframes_manager.cpp
   decoder_thread.h decoder_thread.cpp
   glwidget.h glwidget.cpp
+  roi_rect_gl_helper.h roi_rect_gl_helper.cpp
+  yuv_grid_viewer.h yuv_grid_viewer.cpp
   images_panel.h images_panel.cpp
+  ffmpeg_av_helper.h ffmpeg_av_helper.cpp
   resource.qrc
+  hw_decode_8c_example.cpp
 )
 
 #if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)

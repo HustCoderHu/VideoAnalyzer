@@ -1,11 +1,15 @@
 #include <QWheelEvent>
+//#include <GL/gl.h>
 #include "glwidget.h"
 extern "C" { // 用C规则编译指定的代码
 #include "libavcodec/avcodec.h"
+#include "libavutil/pixdesc.h"
 }
 
-#include "mylog.h"
+#include "ffmpeg_av_helper.h"
 
+#include "mylog.h"
+using std::make_shared;
 
 // 三个顶点坐标XYZ，VAO、VBO数据播放，范围时[-1 ~ 1]直接
 static GLfloat vertices[] = {
@@ -20,12 +24,17 @@ static GLuint indices[] = {0, 1, 3,
 
 
 GLWidget::GLWidget(QWidget* parent, Qt::WindowFlags f)
+//    : frame_data(nullptr, std::default_delete<uint8_t[]>())
 {
   // 初始化视图大小，由于Shader里面有YUV转RGB的代码，会初始化显示为绿色，这里通过将视图大小设置为0避免显示绿色背景
   m_pos = QPointF(0, 0);
   m_zoomSize = QSize(0, 0);
 
 //  setMinimumSize(10, 10);
+
+  roi_rect_gl_helper_ = new RoiRectGLHelper(this);
+
+  yuv_grid_ = new YUVGridViewer;
 }
 
 GLWidget::~GLWidget()
@@ -40,6 +49,8 @@ GLWidget::~GLWidget()
   glDeleteBuffers(1, &VBO);
   glDeleteBuffers(1, &EBO);
   glDeleteVertexArrays(1, &VAO); // 3_3_Core
+
+  yuv_grid_->close();
 }
 
 void GLWidget::repaint(AVFrame *frame)
@@ -49,9 +60,14 @@ void GLWidget::repaint(AVFrame *frame)
   // 如果帧长宽为0则不需要绘制
   if(!frame || frame->width == 0 || frame->height == 0) return;
 
-  if (gl_viewport_rect_.isEmpty()) {
-    gl_viewport_rect_.setRect(0, 0, m_zoomSize.width(), m_zoomSize.height());
-  }
+//  if (gl_viewport_rect_.isEmpty()) {
+//    gl_viewport_rect_.setRect(0, 0, m_zoomSize.width(), m_zoomSize.height());
+//  }
+
+  LOG << "pix_fmt_:" << av_get_pix_fmt_name((AVPixelFormat)frame->format);
+
+  avframe_ = frame;
+//  recordAVFrameData(frame);
 
   m_format = frame->format;
   switch (m_format)
@@ -80,36 +96,59 @@ void GLWidget::repaint(AVFrame *frame)
  */
 void GLWidget::wheelEvent(QWheelEvent *event)
 {
-  if (gl_viewport_rect_.isEmpty())
-    return;
+  return;
+//  if (gl_viewport_rect_.isEmpty())
+//    return;
 
-  QPoint numDegrees;                  // 定义指针类型参数numDegrees用于获取滚轮转角
-  numDegrees = event->angleDelta();   // 获取滚轮转角
-  int step = 0;                       // 设置中间参数step用于将获取的数值转换成整数型
-  if (!numDegrees.isNull())           // 判断滚轮是否转动
-  {
-    step = numDegrees.y();            // 将滚轮转动数值传给中间参数step
-  }
-  int new_width = 0;
-  if (step > 0)
-    new_width = gl_viewport_rect_.width() * 107 / 100;
-  else if (step < 0)
-    new_width = gl_viewport_rect_.width() * 93 / 100;
+//  QPoint numDegrees;                  // 定义指针类型参数numDegrees用于获取滚轮转角
+//  numDegrees = event->angleDelta();   // 获取滚轮转角
+//  int step = 0;                       // 设置中间参数step用于将获取的数值转换成整数型
+//  if (!numDegrees.isNull())           // 判断滚轮是否转动
+//  {
+//    step = numDegrees.y();            // 将滚轮转动数值传给中间参数step
+//  }
+//  int new_width = 0;
+//  if (step > 0)
+//    new_width = gl_viewport_rect_.width() * 107 / 100;
+//  else if (step < 0)
+//    new_width = gl_viewport_rect_.width() * 93 / 100;
 
-  int new_height = new_width * m_zoomSize.height() / m_zoomSize.width();
-  QPointF mouse_pos = event->position();
-  int x = mouse_pos.x() - new_width / 2;
-  // qt widget 鼠标 Y 坐标和 opengl 相反
-  // qt 左上角 (0, 0), opengl 左下角 (0, 0)
-  int y = rect().height() - mouse_pos.y() - new_height / 2;
-  gl_viewport_rect_.setX(x);
-  gl_viewport_rect_.setY(y);
-  gl_viewport_rect_.setWidth(new_width);
-  gl_viewport_rect_.setHeight(new_height);
-  LOG << gl_viewport_rect_;
-  update();
+//  int new_height = new_width * m_zoomSize.height() / m_zoomSize.width();
+//  QPointF mouse_pos = event->position();
+//  int x = mouse_pos.x() - new_width / 2;
+//  // qt widget 鼠标 Y 坐标和 opengl 相反
+//  // qt 左上角 (0, 0), opengl 左下角 (0, 0)
+//  int y = rect().height() - mouse_pos.y() - new_height / 2;
+//  gl_viewport_rect_.setX(x);
+//  gl_viewport_rect_.setY(y);
+//  gl_viewport_rect_.setWidth(new_width);
+//  gl_viewport_rect_.setHeight(new_height);
+//  LOG << gl_viewport_rect_;
+//  update();
 }
 
+void GLWidget::mousePressEvent(QMouseEvent* event)
+{
+  uint32_t width = 96;
+  roi_rect_gl_helper_->setRectWidth(width);
+  roi_rect_gl_helper_->setRectHeight(width);
+  if(event->button() == Qt::LeftButton) {
+    QPoint pos = event->pos();
+    roi_rect_gl_helper_->mousePressEvent(event, frame_size_, m_zoomSize);
+    vector<uint16_t> y_plane;
+    GetRectYfromAVFrame(y_plane, avframe_, roi_rect_gl_helper_->GetYUVRect());
+    yuv_grid_->setRowColAndGridWidth(y_plane.size() / width + 1, width, 10);
+    yuv_grid_->UpdateTableItem(y_plane, width);
+  } else if(event->button() == Qt::RightButton) {
+
+  }
+  update();
+
+  if (! yuv_grid_->isVisible())
+    yuv_grid_->show();
+  else
+    yuv_grid_->update();
+}
 
 void GLWidget::initializeGL()
 {
@@ -176,24 +215,26 @@ void GLWidget::initializeGL()
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   glBindVertexArray(0); // 设置为零以破坏现有的顶点数组对象绑定
 //3_3_Core
+
+  roi_rect_gl_helper_->OnInitializeGL();
   glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // 指定颜色缓冲区的清除值(背景色)
 }
 
 void GLWidget::resizeGL(int w, int h)
 {
-  if(m_size.width() < 0 || m_size.height() < 0) return;
+  if(frame_size_.width() < 0 || frame_size_.height() < 0) return;
 
   // 计算需要显示图片的窗口大小，用于实现长宽等比自适应显示
-  if((double(w) / h) < (double(m_size.width()) / m_size.height()))
+  if((double(w) / h) < (double(frame_size_.width()) / frame_size_.height()))
   {
     m_zoomSize.setWidth(w);
-    m_zoomSize.setHeight(((double(w) / m_size.width()) * m_size.height()));
+    m_zoomSize.setHeight(((double(w) / frame_size_.width()) * frame_size_.height()));
     // 这里不使用QRect，使用QRect第一次设置时有误差bug
   }
   else
   {
     m_zoomSize.setHeight(h);
-    m_zoomSize.setWidth((double(h) / m_size.height()) * m_size.width());
+    m_zoomSize.setWidth((double(h) / frame_size_.height()) * frame_size_.width());
   }
   m_pos.setX(double(w - m_zoomSize.width()) / 2);
   m_pos.setY(double(h - m_zoomSize.height()) / 2);
@@ -209,9 +250,11 @@ void GLWidget::paintGL()
 //  glViewport(m_pos.x(), m_pos.y(),
 //             m_zoomSize.width() - black_border_width, m_zoomSize.height() - black_border_height);
 //  glViewport(0, 0, m_zoomSize.width() - black_border_width, m_zoomSize.height() - black_border_height);
+  // 对齐到左上角
+  glViewport(0, size().height() - m_zoomSize.height(), m_zoomSize.width(), m_zoomSize.height());
 //  glViewport(x, y, gl_viewport_width_, gl_viewport_height_);
-  glViewport(gl_viewport_rect_.x(), gl_viewport_rect_.y(),
-             gl_viewport_rect_.width(), gl_viewport_rect_.height());
+//  glViewport(gl_viewport_rect_.x(), gl_viewport_rect_.y(),
+//             gl_viewport_rect_.width(), gl_viewport_rect_.height());
 
   // 设置视图大小实现图片自适应
 
@@ -248,6 +291,16 @@ void GLWidget::paintGL()
                  6,                 // 指定要渲染的元素数(点数)
                  GL_UNSIGNED_INT,   // 指定索引中值的类型(indices)
                  nullptr);          // 指定当前绑定到GL_ELEMENT_array_buffer目标的缓冲区的数据存储中数组中第一个索引的偏移量。
+
+//  // 激活顶点数组
+//glEnableClientState(GL_VERTEX_ARRAY);
+//  GLfloat rect_vertices[] = {
+//      0.3, 0.3,
+//      0.3, 0.6,
+//      0.6, 0.6,
+//      0.6, 0.3
+//  };
+//  glDrawArrays(GL_LINE_LOOP, 0, rect_vertices);
 //  3_3_Core
   glBindVertexArray(0);
   // 释放纹理
@@ -273,6 +326,13 @@ void GLWidget::paintGL()
     break;
   }
   m_program->release();
+
+  roi_rect_gl_helper_->OnPaintGL();
+}
+
+void GLWidget::paintRoiRect()
+{
+
 }
 
 /**
@@ -282,8 +342,9 @@ void GLWidget::paintGL()
 void GLWidget::repaintTexYUV420P(AVFrame* frame)
 {
   // 当切换显示的视频后，如果分辨率不同则需要重新创建纹理，否则会崩溃
-  if(frame->width != m_size.width() || frame->height != m_size.height())
+  if(frame->width != frame_size_.width() || frame->height != frame_size_.height())
   {
+    LOG << "pix_fmt_:" << av_get_pix_fmt_name((AVPixelFormat)frame->format);
     freeTexYUV420P();
   }
   initTexYUV420P(frame);
@@ -309,8 +370,6 @@ void GLWidget::initTexYUV420P(AVFrame* frame)
   {
     // 创建2D纹理
     m_texY = new QOpenGLTexture(QOpenGLTexture::Target2D);
-//    m_texY->create();
-    QOpenGLContext* ctx = context();
     // 设置纹理大小
     m_texY->setSize(frame->width, frame->height);
 //    m_texY->setSize(1920, 1080);
@@ -325,8 +384,8 @@ void GLWidget::initTexYUV420P(AVFrame* frame)
     m_texY->allocateStorage();
 
     // 记录图像分辨率
-    m_size.setWidth(frame->width);
-    m_size.setHeight(frame->height);
+    frame_size_.setWidth(frame->width);
+    frame_size_.setHeight(frame->height);
     resizeGL(this->width(), this->height());
 
   }
@@ -381,7 +440,7 @@ void GLWidget::freeTexYUV420P()
 void GLWidget::repaintTexNV12(AVFrame* frame)
 {
   // 当切换显示的视频后，如果分辨率不同则需要重新创建纹理，否则会崩溃
-  if(frame->width != m_size.width() || frame->height != m_size.height())
+  if(frame->width != frame_size_.width() || frame->height != frame_size_.height())
   {
     freeTexNV12();
   }
@@ -421,8 +480,8 @@ void GLWidget::initTexNV12(AVFrame* frame)
     m_texY->allocateStorage();
 
     // 记录图像分辨率
-    m_size.setWidth(frame->width);
-    m_size.setHeight(frame->height);
+    frame_size_.setWidth(frame->width);
+    frame_size_.setHeight(frame->height);
     resizeGL(this->width(), this->height());
 
   }
@@ -452,3 +511,25 @@ void GLWidget::freeTexNV12()
     m_texUV = nullptr;
   }
 }
+
+void GLWidget::recordAVFrameData(AVFrame* frame)
+{
+  if (AV_PIX_FMT_YUV420P == frame->format) {
+    uint32_t new_plain_len = frame->width * frame->height;
+    uint8_t *data = nullptr;
+    if (new_plain_len > frame_size_.width() * frame_size_.height()) {
+      data = new uint8_t[new_plain_len];
+      frame_data.reset(data);
+    } else
+      data = frame_data.get();
+
+    int offset = 0;
+    uint8_t *plane_y = frame->data[0];
+    for (uint16_t i = 0; i < frame->height; ++i) {
+      memcpy(data, plane_y, frame->width);
+      data += frame->width;
+      plane_y += frame->linesize[0]; // data 有对齐, 要跳过多余字节
+    }
+  }
+}
+
