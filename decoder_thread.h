@@ -12,9 +12,17 @@ extern "C" {
 }
 
 #include "avframes_manager.h"
+#include "gop_recorder.h"
 
 using std::vector;
 using std::map;
+
+struct DecodeStat {
+  int64_t gop_key_frame_id = -1;
+  int64_t gop_key_frame_pts = INT64_MIN;
+  int64_t cur_frame_pts = INT64_MIN;
+  int64_t cur_frame_dts = INT64_MIN;
+};
 
 class DecoderThread : public QObject
 {
@@ -25,6 +33,10 @@ public:
 
   void set_video_file(const char* file) { video_file_ = file; }
   void Init(const char* file);
+
+  void InitGopRecorder();
+
+  void Seek2frame(int64_t frame_id);
 
   int output_video_frame(AVFrame *frame);
 
@@ -50,7 +62,8 @@ public slots:
   void on_signal_exit();
 
 signals:
-  void signal_frame_decoded(uint32_t frame_id, AVFrame *avframe);
+  void signal_frame_decoded(uint32_t frame_id, AVFrame *avframe,
+                            AVRational time_base);
   void signal_last_frame_decoded(AVFrame *avframe);
   void signal_all_frames_decoded();
 
@@ -66,6 +79,8 @@ private:
 
   AVFormatContext *fmt_ctx_ = NULL;
   AVCodecContext *video_codec_ctx_ = NULL; // audio
+  GopRecorder gop_recorder_;
+  DecodeStat decode_stat_;
 
   int width_, height_;
 

@@ -94,6 +94,7 @@ void DecoderThread::Init(const char* file)
   //  if (video_codec_ctx_)
   //    decode_packet(video_codec_ctx_, NULL);
 
+  InitGopRecorder();
   printf("Demuxing succeeded.\n");
 
 //    if (video_stream_) {
@@ -113,6 +114,36 @@ end:
   //  av_free(video_dst_data[0]);
 
   LOG << "ret:" << ret;
+}
+
+void DecoderThread::InitGopRecorder()
+{
+  int64_t frame_id = 0;
+  while (av_read_frame(fmt_ctx_, avpacket_) >= 0) {
+    if (avpacket_->stream_index == video_stream_idx_) {
+      gop_recorder_.UpdatePacket(frame_id++, avpacket_);
+    }
+    av_packet_unref(avpacket_);
+  }
+
+  // reset fptr to begining
+  char av_err_str[AV_ERROR_MAX_STRING_SIZE];
+  const FrameKey *fk = gop_recorder_.GetGopFirstKeyFrame(0);
+  if (fk != nullptr) {
+    int ret = avformat_seek_file(fmt_ctx_,
+                                 video_stream_idx_,
+                                 INT64_MIN,
+                                 fk->pts,
+                                 fk->pts + 4000,
+                                 0);
+    if (ret < 0) {
+      av_make_error_string(av_err_str, AV_ERROR_MAX_STRING_SIZE, ret);
+      LOG << "avformat_seek_file error: " << av_err_str;
+    } else {
+      LOG << "avformat_seek_file ok";
+    }
+  }
+  LOG << "gop_recorder_: " << gop_recorder_.String().c_str();
 }
 
 
@@ -386,7 +417,7 @@ uint32_t DecoderThread::emit_frames(uint32_t n)
       LOG << "avframes_mgr.GetDecoded return NULL";
       break;
     }
-    emit signal_frame_decoded(frame_id, frame);
+    emit signal_frame_decoded(frame_id, frame, video_stream_->time_base);
   }
   return sent;
 }
@@ -408,6 +439,10 @@ uint32_t DecoderThread::decode_and_cache(uint32_t max_cache)
   char av_err_str[AV_ERROR_MAX_STRING_SIZE];
 
   frame = avframes_mgr.GetFree();
+  if (NULL == frame) {
+    LOG << "avframes_mgr.GetFree() NULL";
+    goto end;
+  }
   // read frames from the file
   while (av_read_frame(fmt_ctx_, avpacket_) >= 0) {
     if (avpacket_->stream_index != video_stream_idx_) {

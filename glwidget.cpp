@@ -1,12 +1,9 @@
-#include <QWheelEvent>
 //#include <GL/gl.h>
 #include "glwidget.h"
 extern "C" { // 用C规则编译指定的代码
 #include "libavcodec/avcodec.h"
 #include "libavutil/pixdesc.h"
 }
-
-#include "ffmpeg_av_helper.h"
 
 #include "mylog.h"
 using std::make_shared;
@@ -31,10 +28,6 @@ GLWidget::GLWidget(QWidget* parent, Qt::WindowFlags f)
   m_zoomSize = QSize(0, 0);
 
 //  setMinimumSize(10, 10);
-
-  roi_rect_gl_helper_ = new RoiRectGLHelper(this);
-
-  yuv_grid_ = new YUVGridViewer;
 }
 
 GLWidget::~GLWidget()
@@ -49,8 +42,6 @@ GLWidget::~GLWidget()
   glDeleteBuffers(1, &VBO);
   glDeleteBuffers(1, &EBO);
   glDeleteVertexArrays(1, &VAO); // 3_3_Core
-
-  yuv_grid_->close();
 }
 
 void GLWidget::repaint(AVFrame *frame)
@@ -88,66 +79,6 @@ void GLWidget::repaint(AVFrame *frame)
 //  av_frame_unref(frame);  //  取消引用帧引用的所有缓冲区并重置帧字段。
 
   this->update();
-}
-
-/**
- * @brief 根据鼠标滚轮调整
- * @param event
- */
-void GLWidget::wheelEvent(QWheelEvent *event)
-{
-  return;
-//  if (gl_viewport_rect_.isEmpty())
-//    return;
-
-//  QPoint numDegrees;                  // 定义指针类型参数numDegrees用于获取滚轮转角
-//  numDegrees = event->angleDelta();   // 获取滚轮转角
-//  int step = 0;                       // 设置中间参数step用于将获取的数值转换成整数型
-//  if (!numDegrees.isNull())           // 判断滚轮是否转动
-//  {
-//    step = numDegrees.y();            // 将滚轮转动数值传给中间参数step
-//  }
-//  int new_width = 0;
-//  if (step > 0)
-//    new_width = gl_viewport_rect_.width() * 107 / 100;
-//  else if (step < 0)
-//    new_width = gl_viewport_rect_.width() * 93 / 100;
-
-//  int new_height = new_width * m_zoomSize.height() / m_zoomSize.width();
-//  QPointF mouse_pos = event->position();
-//  int x = mouse_pos.x() - new_width / 2;
-//  // qt widget 鼠标 Y 坐标和 opengl 相反
-//  // qt 左上角 (0, 0), opengl 左下角 (0, 0)
-//  int y = rect().height() - mouse_pos.y() - new_height / 2;
-//  gl_viewport_rect_.setX(x);
-//  gl_viewport_rect_.setY(y);
-//  gl_viewport_rect_.setWidth(new_width);
-//  gl_viewport_rect_.setHeight(new_height);
-//  LOG << gl_viewport_rect_;
-//  update();
-}
-
-void GLWidget::mousePressEvent(QMouseEvent* event)
-{
-  uint32_t width = 96;
-  roi_rect_gl_helper_->setRectWidth(width);
-  roi_rect_gl_helper_->setRectHeight(width);
-  if(event->button() == Qt::LeftButton) {
-    QPoint pos = event->pos();
-    roi_rect_gl_helper_->mousePressEvent(event, frame_size_, m_zoomSize);
-    vector<uint16_t> y_plane;
-    GetRectYfromAVFrame(y_plane, avframe_, roi_rect_gl_helper_->GetYUVRect());
-    yuv_grid_->setRowColAndGridWidth(y_plane.size() / width + 1, width, 10);
-    yuv_grid_->UpdateTableItem(y_plane, width);
-  } else if(event->button() == Qt::RightButton) {
-
-  }
-  update();
-
-  if (! yuv_grid_->isVisible())
-    yuv_grid_->show();
-  else
-    yuv_grid_->update();
 }
 
 void GLWidget::initializeGL()
@@ -215,8 +146,6 @@ void GLWidget::initializeGL()
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   glBindVertexArray(0); // 设置为零以破坏现有的顶点数组对象绑定
 //3_3_Core
-
-  roi_rect_gl_helper_->OnInitializeGL();
   glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // 指定颜色缓冲区的清除值(背景色)
 }
 
@@ -326,13 +255,6 @@ void GLWidget::paintGL()
     break;
   }
   m_program->release();
-
-  roi_rect_gl_helper_->OnPaintGL();
-}
-
-void GLWidget::paintRoiRect()
-{
-
 }
 
 /**

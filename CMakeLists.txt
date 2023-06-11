@@ -28,10 +28,13 @@ set(PROJECT_SOURCES
   mainwindow.h
   mainwindow.ui
   avframes_manager.h avframes_manager.cpp
+  gop_recorder.h gop_recorder.cpp
   decoder_thread.h decoder_thread.cpp
   glwidget.h glwidget.cpp
+  image_glwidget.h image_glwidget.cpp
   roi_rect_gl_helper.h roi_rect_gl_helper.cpp
   yuv_grid_viewer.h yuv_grid_viewer.cpp
+  preview_glwidget.h preview_glwidget.cpp
   images_panel.h images_panel.cpp
   ffmpeg_av_helper.h ffmpeg_av_helper.cpp
   resource.qrc

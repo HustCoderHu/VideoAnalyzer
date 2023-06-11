@@ -7,7 +7,8 @@
 #include <QGridLayout>
 
 #include "decoder_thread.h"
-#include "glwidget.h"
+#include "image_glwidget.h"
+#include "preview_glwidget.h"
 
 using std::vector;
 using std::map;
@@ -30,12 +31,12 @@ signals:
   void signal_frame_consumed(AVFrame* frame);
 
 private slots:
-  void on_frame_decoded(uint32_t frame_id, AVFrame* avframe);
+  void on_frame_decoded(uint32_t frame_id, AVFrame* avframe, AVRational time_base);
   void on_timer();
 
 public:
   map<uint32_t, AVFrame*> frames_map; // frame_id -> AVFrame*
-  vector<GLWidget*> glwidgets_; // size = 2^x
+  vector<ImageGLWidget*> image_glwidgets_; // size = 2^x
   // AVFrame record at [ frame_id % glwidgets_.size() ]
 
   // layout 第一个 widget 的 id
@@ -46,11 +47,16 @@ public:
   vector<uint32_t> displayed_frame_ids;
 
   QGridLayout *layout_ = nullptr;
-  uint32_t layout_row_ = 1;
-  uint32_t layout_col_ = 1;
+  uint32_t layout_row_ = 3;
+  uint32_t layout_col_ = 7;
+
+  PreviewGLWidget* preview_bar_glwidget;
 
   DecoderThread *dec_obj_ = nullptr;
   QThread *dec_thread_;
   QTimer *timer_ = nullptr;
+
+  int64_t last_frame_play_ms = -1;
+  int32_t last_gl_index = -1;
 };
 

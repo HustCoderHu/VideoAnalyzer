@@ -13,6 +13,10 @@ extern "C" {
 #include <libavutil/timestamp.h>
 }
 
+bool PacketIsKeyFrame(const AVPacket* packet) {
+  return packet->flags & AV_PKT_FLAG_KEY;
+}
+
 void GetRectYfromAVFrame(std::vector<uint16_t>& v,
                       const AVFrame* frame, const QRect& pixel_rect) {
   v.reserve(frame->width * frame->height);
