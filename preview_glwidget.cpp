@@ -16,8 +16,6 @@ PreviewGLWidget::~PreviewGLWidget()
 {
   if (sws_ctx_ != NULL)
     sws_freeContext(sws_ctx_);
-  if (tmp_scaled_frame_ != NULL)
-    av_frame_free(&tmp_scaled_frame_);
   if (concated_frame_ != NULL)
     av_frame_free(&concated_frame_);
 }
@@ -46,11 +44,11 @@ void PreviewGLWidget::ScaleFrameAndCache(AVFrame* frame)
                              (AVPixelFormat)new_frame->format);
   int ret = sws_scale(sws_ctx_,
                       frame->data, frame->linesize, 0, frame->height,
-                      tmp_scaled_frame_->data, tmp_scaled_frame_->linesize);
+                      new_frame->data, new_frame->linesize);
   char av_err_str[AV_ERROR_MAX_STRING_SIZE];
   if (ret < 0) {
     av_make_error_string(av_err_str, AV_ERROR_MAX_STRING_SIZE, ret);
-    LOG << "av_frame_get_buffer ERROR: " << av_err_str;
+    LOG << "sws_scale ERROR: " << av_err_str;
     // return to front
     av_frame_free(&new_frame);
   } else {

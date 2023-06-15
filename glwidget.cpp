@@ -55,7 +55,7 @@ void GLWidget::repaint(AVFrame *frame)
 //    gl_viewport_rect_.setRect(0, 0, m_zoomSize.width(), m_zoomSize.height());
 //  }
 
-  LOG << "pix_fmt_:" << av_get_pix_fmt_name((AVPixelFormat)frame->format);
+//  LOG << "pix_fmt_:" << av_get_pix_fmt_name((AVPixelFormat)frame->format);
 
   avframe_ = frame;
 //  recordAVFrameData(frame);
@@ -266,7 +266,7 @@ void GLWidget::repaintTexYUV420P(AVFrame* frame)
   // 当切换显示的视频后，如果分辨率不同则需要重新创建纹理，否则会崩溃
   if(frame->width != frame_size_.width() || frame->height != frame_size_.height())
   {
-    LOG << "pix_fmt_:" << av_get_pix_fmt_name((AVPixelFormat)frame->format);
+//    LOG << "pix_fmt_:" << av_get_pix_fmt_name((AVPixelFormat)frame->format);
     freeTexYUV420P();
   }
   initTexYUV420P(frame);

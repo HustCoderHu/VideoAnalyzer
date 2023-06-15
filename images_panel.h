@@ -28,7 +28,7 @@ public:
 
 signals:
   void signal_require_frames(uint32_t n);
-  void signal_frame_consumed(AVFrame* frame);
+  void signal_frame_consumed(uint32_t frame_id, AVFrame* frame);
 
 private slots:
   void on_frame_decoded(uint32_t frame_id, AVFrame* avframe, AVRational time_base);

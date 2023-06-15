@@ -56,6 +56,5 @@ public:
   // 多个 frame 水平合并成预览图
   deque<AVFrame*> scaled_frames_;
 
-  AVFrame* tmp_scaled_frame_ = NULL;
   AVFrame* concated_frame_ = NULL;
 };

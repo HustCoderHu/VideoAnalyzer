@@ -6,8 +6,10 @@ ImagesPanel::ImagesPanel(QWidget *parent)
     : QWidget{parent}
 {
   const char* file = "D:/docs/movie/.unknown/6798973.mp4";
+  file = "F:/docs/test_videos/Wildlife.wmv";
+  file = "F:/docs/test_videos/20230511092644_origin.mp4";
 //  file = "Z:/coding/github/steins_gate_cut.mkv";
-  file = "z:/coding/github/VideoAnalyzer/cut.mkv";
+//  file = "z:/coding/github/VideoAnalyzer/cut.mkv";
 //  file = "Z:/download/DownKyi-1.5.9/Media/鬼泣5维吉尔出场全cg动画/1-鬼泣5维吉尔出场全cg动画-1080P 高清-AVC.mp4";
   dec_obj_ = new DecoderThread;
   dec_obj_->Init(file);
@@ -74,7 +76,7 @@ void ImagesPanel::on_frame_decoded(uint32_t frame_id, AVFrame* avframe,
 //  frames_map.emplace(frame_id, avframe);
 
   if (last_frame_play_ms < 0) {
-//    image_glwidgets_[0]->repaint(avframe);
+    image_glwidgets_[0]->repaint(avframe);
     preview_bar_glwidget->OnAVFrame(avframe);
     last_frame_play_ms = avframe->pts * av_q2d(time_base) * 1000;
 //    avframe->pkt_dts
@@ -82,20 +84,19 @@ void ImagesPanel::on_frame_decoded(uint32_t frame_id, AVFrame* avframe,
   } else {
     int64_t play_ms = avframe->pts * av_q2d(time_base) * 1000;
     if (play_ms >= last_frame_play_ms + 1000) {
-      //    uint32_t glw_idx = frame_id % image_glwidgets_.size();
-//      image_glwidgets_[++last_gl_index % image_glwidgets_.size()]->repaint(
-//          avframe);
-      preview_bar_glwidget->OnAVFrame(avframe);
-
-      last_frame_play_ms = play_ms;
-      if (last_gl_index == 20) {
-        timer_->stop();
-        preview_bar_glwidget->ConcatFrames();
-        preview_bar_glwidget->PaintFrame();
-      }
+      ++last_gl_index;
+//      uint32_t glw_idx = frame_id % image_glwidgets_.size();
+      image_glwidgets_[last_gl_index % image_glwidgets_.size()]->repaint(avframe);
+//      preview_bar_glwidget->OnAVFrame(avframe);
+//      last_frame_play_ms = play_ms;
+//      if (last_gl_index == 6) {
+//        timer_->stop();
+//        preview_bar_glwidget->ConcatFrames();
+//        preview_bar_glwidget->PaintFrame();
+//      }
     }
   }
-  emit signal_frame_consumed(avframe);
+  emit signal_frame_consumed(frame_id, avframe);
 }
 
 void ImagesPanel::on_timer()

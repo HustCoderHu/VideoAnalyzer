@@ -22,6 +22,8 @@ static uint8_t *video_dst_data[4] = {NULL};
 static int video_dst_linesize[4];
 static int video_dst_bufsize;
 
+static enum AVPixelFormat hw_pix_fmt;
+
 //static AVFrame *frame = NULL;
 static int video_frame_count = 0;
 
@@ -256,19 +258,26 @@ int DecoderThread::hw_decoder_init(AVCodecContext *ctx, const enum AVHWDeviceTyp
   return err;
 }
 
-//static enum AVPixelFormat get_hw_format(AVCodecContext *ctx,
-//                                        const enum AVPixelFormat *pix_fmts)
-//{
-//  const enum AVPixelFormat *p;
+static enum AVPixelFormat get_hw_format(AVCodecContext *ctx,
+                                        const enum AVPixelFormat *pix_fmts)
+{
+  const enum AVPixelFormat *p = NULL;
 
-//  for (p = pix_fmts; *p != -1; p++) {
-//    if (*p == hw_pix_fmt)
-//      return *p;
-//  }
+  LOG << "hw_pix_fmt: " << av_get_pix_fmt_name((AVPixelFormat)hw_pix_fmt);
 
-//  LOG << "Failed to get HW surface format";
-//  return AV_PIX_FMT_NONE;
-//}
+  for (p = pix_fmts; *p != -1; p++) {
+    LOG << av_get_pix_fmt_name((AVPixelFormat)*p);
+    if (*p == hw_pix_fmt) {
+      break;
+    }
+  }
+
+  if (p != NULL)
+    return *p;
+
+  LOG << "Failed to get HW surface format";
+  return AV_PIX_FMT_NONE;
+}
 
 int DecoderThread::open_codec_context(int *stream_idx,
                                       AVCodecContext **codec_ctx,
@@ -280,7 +289,7 @@ int DecoderThread::open_codec_context(int *stream_idx,
 
   AVHWDeviceType device_type;
   const char* hw_device_type_name = "dxva2";
-  hw_device_type_name = "d3d11va";
+//  hw_device_type_name = "d3d11va";
   if (hw_decode_) {
     device_type = av_hwdevice_find_type_by_name(hw_device_type_name);
     if (AV_HWDEVICE_TYPE_NONE == device_type) {
@@ -323,8 +332,8 @@ int DecoderThread::open_codec_context(int *stream_idx,
         }
         if (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX
             && config->device_type == device_type) {
-          hw_pix_fmt_ = config->pix_fmt;
-          LOG << " found break";
+          hw_pix_fmt = hw_pix_fmt_ = config->pix_fmt;
+          LOG << "found:" << av_get_pix_fmt_name((AVPixelFormat)hw_pix_fmt) << ", break";
           break;
         }
       }
@@ -348,6 +357,7 @@ int DecoderThread::open_codec_context(int *stream_idx,
     }
 
     if (hw_decode_) {
+      (*codec_ctx)->get_format = get_hw_format;
       if (hw_decoder_init(*codec_ctx, device_type) < 0) {
         LOG << "hw_decoder_init < 0";
         return -1;
@@ -393,18 +403,26 @@ int DecoderThread::get_format_from_sample_fmt(const char **fmt, enum AVSampleFor
   return -1;
 }
 
-//AVPixelFormat DecoderThread::get_hw_format(AVCodecContext* ctx, const AVPixelFormat* pix_fmts)
-//{
-//  const enum AVPixelFormat *p;
+uint32_t DecoderThread::emit_frames(const vector<int64_t>& frame_ids)
+{
+  vector<pair<int64_t, AVFrame *> frames = avframes_mgr.GetDecoded(frame_ids);
+  for (auto& p : frames) {
+    int64_t frame_id = p.first;
+    AVFrame* frame = p.second;
+    emit signal_frame_decoded(frame_id, frame, video_stream_->time_base);
+  }
+}
 
-//  for (p = pix_fmts; *p != -1; p++) {
-//    if (*p == hw_pix_fmt)
-//      return *p;
-//  }
-
-//  fprintf(stderr, "Failed to get HW surface format.\n");
-//  return AV_PIX_FMT_NONE;
-//}
+bool DecoderThread::emit_frame(int64_t frame_id)
+{
+  AVFrame* frame = avframes_mgr.GetDecoded(frame_id);
+  if (NULL == frame) {
+    LOG << "ERR: GetDecoded failed, frame_id: " << frame_id;
+    return false;
+  }
+  emit signal_frame_decoded(frame_id, frame, video_stream_->time_base);
+  return true;
+}
 
 uint32_t DecoderThread::emit_frames(uint32_t n)
 {
@@ -427,7 +445,7 @@ static int sent_packets = 0;
 uint32_t DecoderThread::decode_and_cache(uint32_t max_cache)
 {
   if (hw_decode_)
-    return decode_hw_and_cache(max_cache);
+    return hw_decode_and_cache(max_cache);
 
   int ret = 0;
   AVFrame *frame = NULL;
@@ -473,7 +491,10 @@ uint32_t DecoderThread::decode_and_cache(uint32_t max_cache)
         LOG << "avcodec_receive_frame error: " << av_err_str;
         goto end;
       }
-      LOG << "sent_packets:" << ++sent_packets << " PutDecoded(frame)";
+      LOG << "PutDecoded(frame): " << ++sent_packets
+          << " format: " << av_get_pix_fmt_name((AVPixelFormat)frame->format)
+          << " pts; " << frame->pts;
+      video_codec_ctx_->frame_number
       avframes_mgr.PutDecoded(frame);
       frame = avframes_mgr.GetFree();
     }
@@ -490,7 +511,7 @@ end:
   return avframes_mgr.DecodedFrames();
 }
 
-int DecoderThread::decode_hw_and_cache(uint32_t max_cache)
+int DecoderThread::hw_decode_and_cache(uint32_t max_cache)
 {
   int ret = 0;
   AVFrame *frame = NULL, *sw_frame = NULL;
@@ -524,13 +545,11 @@ int DecoderThread::decode_hw_and_cache(uint32_t max_cache)
     // get all the available frames from the decoder
     while (ret >= 0) {
       ret = avcodec_receive_frame(video_codec_ctx_, frame);
-//      LOG << "sent_packets:" << ++sent_packets << " avcodec_receive_frame ret:" << ret;
-      if (ret < 0) {
-        // those two return values are special and mean there is no output
-        // frame available, but there were no errors during decoding
-        if (ret == AVERROR_EOF || ret == AVERROR(EAGAIN) )
-          break;
-
+      // those two return values are special and mean there is no output
+      // frame available, but there were no errors during decoding
+      if (ret == AVERROR_EOF || ret == AVERROR(EAGAIN) )
+        break;
+      else if (ret < 0) {
         av_make_error_string(av_err_str, AV_ERROR_MAX_STRING_SIZE, ret);
         LOG << "avcodec_receive_frame error: " << av_err_str;
         goto end;
@@ -539,25 +558,31 @@ int DecoderThread::decode_hw_and_cache(uint32_t max_cache)
       if (frame->format == hw_pix_fmt_) {
         // retrieve data from GPU to CPU
         //        ret = av_hwframe_map(sw_frame, frame, 0);
-        ret = av_hwframe_transfer_data(sw_frame, frame, 0);
-        if (ret < 0) {
+        if ((ret = av_hwframe_transfer_data(sw_frame, frame, 0)) < 0) {
           av_make_error_string(av_err_str, AV_ERROR_MAX_STRING_SIZE, ret);
           LOG << "av_hwframe_transfer_data err:" << av_err_str;
           //          fprintf(stderr, "Error transferring the data to system memory\n");
           continue;
         }
+//        else {
+//          LOG << "av_hwframe_transfer_data success: " << ret;
+//        }
         //        LOG << "sent_packets:" << ++sent_packets << " PutDecoded(sw_frame)";
+        sw_frame->pts = frame->pts;
+        LOG << "PutDecoded(sw_frame): " << ++sent_packets
+            << " format: " << av_get_pix_fmt_name((AVPixelFormat)sw_frame->format)
+            << " pts; " << sw_frame->pts;
         avframes_mgr.PutDecoded(sw_frame);
-        sw_frame = avframes_mgr.GetFree();
-        if (NULL == sw_frame) {
+        if ((sw_frame = avframes_mgr.GetFree()) == NULL) {
           LOG << "sw_frame = avframes_mgr.GetFree() NULL";
           break;
         }
       } else {
-        LOG << "sent_packets:" << ++sent_packets << " PutDecoded(frame)";
+        LOG << "PutDecoded(frame): " << ++sent_packets
+            << " format: " << av_get_pix_fmt_name((AVPixelFormat)frame->format)
+            << " pts: " << frame->pts;
         avframes_mgr.PutDecoded(frame);
-        frame = avframes_mgr.GetFree();
-        if (NULL == frame) {
+        if ((frame = avframes_mgr.GetFree()) == NULL) {
           LOG << "frame = avframes_mgr.GetFree() NULL";
           break;
         }
@@ -584,6 +609,7 @@ end:
 
 void DecoderThread::on_require_frames(uint32_t n)
 {
+//  return;
   uint32_t sent = emit_frames(n);
   if (sent == n)
     return;
@@ -596,7 +622,7 @@ void DecoderThread::on_require_frames(uint32_t n)
   emit_frames(need_decode_frames);
 }
 
-void DecoderThread::on_frame_consumed(AVFrame* avframe)
+void DecoderThread::on_frame_consumed(uint32_t frame_id, AVFrame* avframe)
 {
 //  LOG << avframe;
   av_frame_unref(avframe);
