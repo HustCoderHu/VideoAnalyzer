@@ -70,7 +70,7 @@ set_target_properties(1st_with_ffmpeg PROPERTIES
 )
 
 #设置ffmpeg头文件和库路径
-set(FFMPEG_PREFIX_PATH D:/softwares/coding/ffmpeg-5.1.2-full_build-shared)
+set(FFMPEG_PREFIX_PATH G:/softwares/media/ffmpeg-5.1.2-full_build-shared)
 include_directories( ${FFMPEG_PREFIX_PATH}/include )
 #find_library(AVUTIL_LIBRARY avutil)
 
@@ -89,13 +89,20 @@ list(APPEND FFMPEG_LIBS
   ${AVUTIL_LIBRARY} ${AVDEVICE_LIBRARY} ${POSTPROC_LIBRARY}
   ${SWRESAMPLE_LIBRARY} ${SWSCALE_LIBRARY}
 )
+
+set(LZ4_PATH G:/softwares/coding/lz4)
+include_directories(${LZ4_PATH}/include)
+FIND_LIBRARY(LZ4_LIB lz4 ${LZ4_PATH}/dll)
+message(STATUS "LZ4_LIB:" ${LZ4_LIB})
+
 set(LINK_QT_LIBS "")
 foreach(lib ${QT_LIBS})
   list(APPEND LINK_QT_LIBS "Qt${QT_VERSION_MAJOR}::${lib}")
 endforeach()
 message(STATUS ${LINK_QT_LIBS})
 #Qt${QT_VERSION_MAJOR}::Widgets
-target_link_libraries(1st_with_ffmpeg PUBLIC ${LINK_QT_LIBS} ${FFMPEG_LIBS})
+target_link_libraries(1st_with_ffmpeg
+  PUBLIC ${LINK_QT_LIBS} ${FFMPEG_LIBS} ${LZ4_LIB})
 
 #target_link_libraries(1st_with_ffmpeg )
 
@@ -107,9 +114,9 @@ set_target_properties(1st_with_ffmpeg PROPERTIES
     WIN32_EXECUTABLE TRUE
 )
 
-install(TARGETS 1st_with_ffmpeg
-    BUNDLE DESTINATION .
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+#install(TARGETS 1st_with_ffmpeg
+#    BUNDLE DESTINATION .
+#    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
 if(QT_VERSION_MAJOR EQUAL 6)
     qt_finalize_executable(1st_with_ffmpeg)
