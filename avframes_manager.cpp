@@ -52,7 +52,7 @@ AVFrame* AVFramesManager::GetDecoded(int64_t frame_id)
 
 vector<pair<int64_t, AVFrame *> > AVFramesManager::GetDecoded(const vector<int64_t> &frame_ids)
 {
-  vector<pair<int64_t, AVFrame *> frames;
+  vector<pair<int64_t, AVFrame *> > frames;
   frames.reserve(frame_ids.size());
   for (int64_t fid : frame_ids) {
     auto itr = decoded_frames_.find(fid);
@@ -79,7 +79,7 @@ AVFrame* AVFramesManager::GetFree()
       LOG << "ERR: can not alloc more AVFrame,"
              " because already alloc too much memory: " << (alloc_bytes_ >> 20)
           << " MB, max: " << (max_alloc_bytes_ >> 20) << " MB";
-      return;
+      return NULL;
     }
 
 //    if (cur_alloc_frames_ == max_alloc_frames_) {

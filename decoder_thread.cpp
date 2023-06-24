@@ -405,7 +405,7 @@ int DecoderThread::get_format_from_sample_fmt(const char **fmt, enum AVSampleFor
 
 uint32_t DecoderThread::emit_frames(const vector<int64_t>& frame_ids)
 {
-  vector<pair<int64_t, AVFrame *> frames = avframes_mgr.GetDecoded(frame_ids);
+  vector<pair<int64_t, AVFrame *> > frames = avframes_mgr.GetDecoded(frame_ids);
   for (auto& p : frames) {
     int64_t frame_id = p.first;
     AVFrame* frame = p.second;
@@ -494,7 +494,7 @@ uint32_t DecoderThread::decode_and_cache(uint32_t max_cache)
       LOG << "PutDecoded(frame): " << ++sent_packets
           << " format: " << av_get_pix_fmt_name((AVPixelFormat)frame->format)
           << " pts; " << frame->pts;
-      video_codec_ctx_->frame_number
+      video_codec_ctx_->frame_number;
       avframes_mgr.PutDecoded(frame);
       frame = avframes_mgr.GetFree();
     }

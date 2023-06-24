@@ -8,8 +8,8 @@
 #include <memory>
 #include <thread>
 
-#include <lz4.h>
-#include <lz4frame.h>
+//#include <lz4.h>
+//#include <lz4frame.h>
 
 using std::string;
 using std::vector;
@@ -35,7 +35,7 @@ public:
     } else {
 
     }
-    if ( ! tmp_comressed_buffer.Empty() )
+//    if ( ! tmp_comressed_buffer.Empty() )
   }
 
 private:
